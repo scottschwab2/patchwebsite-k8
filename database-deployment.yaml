@@ -28,13 +28,13 @@ spec:
         - containerPort: 3306
         env:
         - name: MARIADB_ROOT_PASSWORD
-          value: covid19
+          value: -------
         - name: MARIADB_DATABASE
           value: wordpress
         - name: MARIADB_USER
           value: churchlady
         - name: MARIADB_USER_PASSWORD
-          value: on-the-hill
+          value: ---------l
         volumeMounts:
           - mountPath: /var/lib/mysql
             name: data
