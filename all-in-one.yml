@@ -1,0 +1,175 @@
+# apiVersion: storage.k8s.io/v1
+# kind: storageClass
+# metadata:
+#   name: azure-file
+# provisioner: kubernetes.io/azure-file
+# allowVolumeExpansion: true
+# parameters:
+#   skuName: Standard_LRS
+# ---
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pumpkinpatchdata
+spec:
+  capacity:
+    storage: 4Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  azureFile:
+    shareName: pumpkinpatchdata_1629654668287
+    readOnly: false
+
+
+
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-files
+spec:
+  storageClass: azure-file
+  resources:
+    requests:
+      storage: 2Gi
+  accessModes:
+    - ReadWriteMany
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-files
+spec:
+  storageClass: azure-file
+  resources:
+    requests:
+      storage: 2Gi
+  accessModes:
+    - ReadWriteMany
+
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+      - name: database
+        image: mariadb:10.6
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          value: covid19
+        - name: MARIADB_DATABASE
+          value: wordpress
+        - name: MARIADB_USER
+          value: churchlady
+        - name: MARIADB_USER_PASSWORD
+          value: on-the-hill
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: database-files
+
+
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: database-service
+spec:
+  type: ClusterIP
+  selector:
+    app: database
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - name: wordpress
+        image: wordpress:5.8
+        imagePullPolicy: IfNotPresent        
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: database-service
+        - name: WORDPRESS_DB_USER
+          value: root
+        - name: WORDPRESS_DB_PASSWORD
+          value: covid19
+        - name: WORDPRESS_DB_NAME
+          value: wordpress
+        - name: WORDPRESS_DEBUG
+          value: "1"
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: wordpress-files
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: wordpress-service
+spec:
+  type: NodePort
+  selector:
+    app: wordpress
+  ports:
+    - port: 80
+    - port: 443
